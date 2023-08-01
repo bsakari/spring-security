@@ -1,6 +1,9 @@
 package com.springsecuritywithamigos.springsecuritywithamigos.security;
 
 import com.springsecuritywithamigos.springsecuritywithamigos.auth.ApplicationUserService;
+import com.springsecuritywithamigos.springsecuritywithamigos.jwt.JwtConfig;
+import com.springsecuritywithamigos.springsecuritywithamigos.jwt.JwtTokenVerifier;
+import com.springsecuritywithamigos.springsecuritywithamigos.jwt.JwtUsernameAndPasswordAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,10 +13,10 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
-import java.util.concurrent.TimeUnit;
+import javax.crypto.SecretKey;
 
 @Configuration
 @EnableWebSecurity
@@ -21,79 +24,35 @@ import java.util.concurrent.TimeUnit;
 public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
     private final PasswordEncoder passwordEncoder;
     private final ApplicationUserService applicationUserService;
+    private final SecretKey secretKey;
+    private final JwtConfig jwtConfig;
 
     @Autowired
-    public ApplicationSecurityConfig(PasswordEncoder passwordEncoder, ApplicationUserService applicationUserService) {
+    public ApplicationSecurityConfig(PasswordEncoder passwordEncoder, ApplicationUserService applicationUserService, SecretKey secretKey, JwtConfig jwtConfig) {
         this.passwordEncoder = passwordEncoder;
         this.applicationUserService = applicationUserService;
+        this.secretKey = secretKey;
+        this.jwtConfig = jwtConfig;
     }
 
-    // BASIC AUTH WITH DEFAULT USERNAME AND PASSWORD
+    // JWT AUTH
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
-//                .csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()) // This is hiding the token from user front end
-//                .and()
                 .csrf().disable()
+                .sessionManagement()
+                    .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .and()
+                .addFilter(new JwtUsernameAndPasswordAuthenticationFilter(authenticationManager(), jwtConfig, secretKey))
+                .addFilterAfter(new JwtTokenVerifier(secretKey, jwtConfig),JwtUsernameAndPasswordAuthenticationFilter.class)
                 .authorizeRequests()
                 .antMatchers("/","index","/css/*","/js/*").permitAll()
                 .antMatchers("/api/**").hasRole(ApplicationUserRole.STUDENT.name())
-//                .antMatchers(HttpMethod.DELETE,"/management/api/**").hasAuthority(ApplicationUserPermission.COURSE_WRITE.getPermission())
-//                .antMatchers(HttpMethod.POST,"/management/api/**").hasAuthority(ApplicationUserPermission.COURSE_WRITE.getPermission())
-//                .antMatchers(HttpMethod.PUT,"/management/api/**").hasAuthority(ApplicationUserPermission.COURSE_WRITE.getPermission())
-//                .antMatchers(HttpMethod.GET,"/management/api/**").hasAnyRole(ApplicationUserRole.ADMIN.name(), ApplicationUserRole.ADMINTRAINEE.name())
                 .anyRequest()
-                .authenticated()
-                .and()
-                .formLogin()
-                    .loginPage("/login")
-                    .permitAll()
-                    .defaultSuccessUrl("/courses",true)
-                    .passwordParameter("password")
-                    .usernameParameter("username")
-                .and()
-                .rememberMe()//Defaults to 2 weeks
-                    .tokenValiditySeconds((int) TimeUnit.DAYS.toSeconds(21))//Extended to 3 weeks
-                    .key("somethingverysecured")
-                    .rememberMeParameter("remember-me")
-                .and()
-                .logout()
-                    .logoutUrl("/logout")
-                    .logoutRequestMatcher(new AntPathRequestMatcher("/logout","GET"))
-                    .clearAuthentication(true)
-                    .invalidateHttpSession(true)
-                    .deleteCookies("JSESSIONID","remember-me")
-                    .logoutSuccessUrl("/login");
+                .authenticated();
+
     }
 
-    /*// BASIC AUTH WITH CUSTOM USERNAME AND PASSWORD
-    @Override
-    @Bean
-    protected UserDetailsService userDetailsService() {
-        UserDetails kingWanyama = User.builder()
-                .username("kingwanyama")
-                .password(passwordEncoder.encode("password"))
-                //.roles(ApplicationUserRole.STUDENT.name())// ROLE_STUDENT
-                .authorities(ApplicationUserRole.STUDENT.getGrantedAuthorities())
-                .build();
-
-        UserDetails wanyamaKing = User.builder()
-                .username("wanyamaking")
-                .password(passwordEncoder.encode("password"))
-                //.roles(ApplicationUserRole.ADMIN.name())//ROLE_ADMIN
-                .authorities(ApplicationUserRole.ADMIN.getGrantedAuthorities())
-                .build();
-
-        UserDetails ajani = User.builder()
-                .username("ajani")
-                .password(passwordEncoder.encode("password"))
-                //.roles(ApplicationUserRole.ADMINTRAINEE.name())// ROLE_ADMINTRAINEE
-                .authorities(ApplicationUserRole.ADMINTRAINEE.getGrantedAuthorities())
-                .build();
-
-        return new InMemoryUserDetailsManager(kingWanyama, wanyamaKing, ajani);
-    }*/
-    // DATABASE AUTHENTICATION
 
     @Override
     protected void configure(AuthenticationManagerBuilder auth) throws Exception {

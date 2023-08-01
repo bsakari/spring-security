@@ -12,7 +12,7 @@ import static com.springsecuritywithamigos.springsecuritywithamigos.security.App
 public enum ApplicationUserRole {
     STUDENT(Sets.newHashSet()),
     ADMINTRAINEE(Sets.newHashSet(COURSE_READ,STUDENT_READ)),
-    ADMIN(Sets.newHashSet(COURSE_READ,COURSE_WRITE,STUDENT_READ,STUDENT_WRITE));
+    ADMIN(Sets.newHashSet(STUDENT_READ,STUDENT_WRITE,COURSE_READ,COURSE_WRITE));
 
     private final Set<ApplicationUserPermission> permissions;
 
